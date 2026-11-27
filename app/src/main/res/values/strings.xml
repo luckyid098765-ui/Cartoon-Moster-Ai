@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">Cartoon Master AI</string>
+    <string name="app_tagline">AI Cartoon Video Studio</string>
+    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="nav_studio">Studio</string>
+    <string name="nav_projects">My Projects</string>
+    <string name="nav_admin">Admin</string>
+    <string name="create_new_cartoon">Create New Cartoon</string>
+    <string name="story_prompt_label">Enter Your Story</string>
+    <string name="story_prompt_hint">Describe your cartoon plot, setting, and action...</string>
+    <string name="character_prompt_label">Custom Characters (Optional)</string>
+    <string name="character_prompt_hint">Describe main characters, outfits, and colors for consistency...</string>
+    <string name="select_style_label">Choose Cartoon Style</string>
+    <string name="select_language_label">Choose Language</string>
+    <string name="select_duration_label">Choose Duration (Max 30 min)</string>
+    <string name="select_quality_label">Choose Video Quality</string>
+    <string name="generate_video_cta">Generate Video</string>
+    <string name="download_video_cta">Download MP4</string>
+    <string name="play_video_cta">Play Video</string>
+    <string name="retry_generation_cta">Retry Generation</string>
+    <string name="delete_project_cta">Delete Project</string>
+    <string name="empty_projects_title">Your Cartoon Library Is Empty</string>
+    <string name="empty_projects_subtitle">Describe a story in the Studio tab to generate your first HD cartoon MP4 up to 30 minutes long.</string>
+    <string name="notification_channel_name">Cartoon Generation</string>
+</resources>

@@ -1,0 +1,6 @@
+{
+  "name": "Cartoon Master AI",
+  "description": "AI Cartoon Video Generator App supporting multi-scene stories, characters, styles (2D, 3D, funny, horror, adventure), multilingual voiceovers (Hindi, Bengali, English), background audio, up to 30-minute MP4 rendering, and cloud video library.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

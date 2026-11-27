@@ -1,0 +1,345 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        ('email_verified' in request.auth.token &&
+         request.auth.token.email_verified == true &&
+         'email' in request.auth.token &&
+         request.auth.token.email == 'sudarshanmanna06@gmail.com') ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidLanguage(lang) {
+      return lang in ['ENGLISH', 'HINDI', 'BENGALI'];
+    }
+
+    function isValidQuality(q) {
+      return q in ['HD_720P', 'FHD_1080P'];
+    }
+
+    function isValidStyle(s) {
+      return s in ['TWO_D', 'THREE_D', 'FUNNY', 'HORROR', 'ADVENTURE', 'FANTASY', 'EDUCATIONAL', 'KIDS_FRIENDLY'];
+    }
+
+    function isValidDuration(d) {
+      return d is int && d in [1, 5, 10, 20, 30];
+    }
+
+    function isValidProjectStatus(st) {
+      return st in ['DRAFT', 'GENERATING_STORY', 'GENERATING_ART', 'SYNTHESIZING_AUDIO', 'RENDERING_VIDEO', 'VERIFYING', 'COMPLETED', 'FAILED'];
+    }
+
+    function isValidSceneStatus(st) {
+      return st in ['PENDING', 'ART_READY', 'AUDIO_READY', 'READY', 'FAILED'];
+    }
+
+    function isValidJobStatus(st) {
+      return st in ['QUEUED', 'RUNNING', 'RETRYING', 'COMPLETED', 'FAILED'];
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 150)) &&
+             (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+             isValidLanguage(data.preferredLanguage) &&
+             isValidQuality(data.preferredQuality) &&
+             data.totalVideosCreated is int && data.totalVideosCreated >= 0 &&
+             data.totalDownloads is int && data.totalDownloads >= 0 &&
+             data.storageUsedBytes is int && data.storageUsedBytes >= 0 &&
+             data.accountStatus in ['ACTIVE', 'SUSPENDED'];
+    }
+
+    function isValidCartoonProject(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 140 &&
+             data.storyPrompt is string && data.storyPrompt.size() >= 1 && data.storyPrompt.size() <= 5000 &&
+             data.characterPrompt is string && data.characterPrompt.size() <= 2000 &&
+             data.characterBible is string && data.characterBible.size() <= 4000 &&
+             isValidStyle(data.style) &&
+             isValidLanguage(data.language) &&
+             isValidDuration(data.durationMinutes) &&
+             isValidQuality(data.quality) &&
+             data.includeVoiceover is bool &&
+             data.includeBgm is bool &&
+             data.includeSfx is bool &&
+             isValidProjectStatus(data.status) &&
+             data.progressPercent is int && data.progressPercent >= 0 && data.progressPercent <= 100 &&
+             data.statusMessage is string && data.statusMessage.size() <= 300 &&
+             data.sceneCount is int && data.sceneCount >= 0 && data.sceneCount <= 200 &&
+             data.completedScenes is int && data.completedScenes >= 0 && data.completedScenes <= 200 &&
+             (!('localVideoPath' in data) || (data.localVideoPath is string && data.localVideoPath.size() <= 500)) &&
+             (!('cloudVideoUrl' in data) || (data.cloudVideoUrl is string && data.cloudVideoUrl.size() <= 1000)) &&
+             (!('thumbnailPath' in data) || (data.thumbnailPath is string && data.thumbnailPath.size() <= 500)) &&
+             data.fileSizeBytes is int && data.fileSizeBytes >= 0 &&
+             data.verifiedMp4 is bool &&
+             data.retryCount is int && data.retryCount >= 0 && data.retryCount <= 20 &&
+             (!('errorMessage' in data) || (data.errorMessage is string && data.errorMessage.size() <= 1000)) &&
+             data.providerUsed is string && data.providerUsed.size() >= 1 && data.providerUsed.size() <= 100 &&
+             data.downloadCount is int && data.downloadCount >= 0;
+    }
+
+    function isValidCartoonScene(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.projectId is string && isValidId(data.projectId) &&
+             data.sceneIndex is int && data.sceneIndex >= 0 && data.sceneIndex <= 500 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 140 &&
+             data.visualPrompt is string && data.visualPrompt.size() >= 1 && data.visualPrompt.size() <= 2000 &&
+             data.narrationText is string && data.narrationText.size() <= 3000 &&
+             data.sfxCue is string && data.sfxCue.size() <= 100 &&
+             data.cameraMotion is string && data.cameraMotion.size() <= 60 &&
+             data.durationSeconds is int && data.durationSeconds >= 1 && data.durationSeconds <= 180 &&
+             (!('artFilePath' in data) || (data.artFilePath is string && data.artFilePath.size() <= 500)) &&
+             (!('audioFilePath' in data) || (data.audioFilePath is string && data.audioFilePath.size() <= 500)) &&
+             isValidSceneStatus(data.status);
+    }
+
+    function isValidDownloadRecord(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.projectId is string && isValidId(data.projectId) &&
+             data.projectTitle is string && data.projectTitle.size() >= 1 && data.projectTitle.size() <= 140 &&
+             isValidQuality(data.quality) &&
+             data.fileSizeBytes is int && data.fileSizeBytes >= 0 &&
+             data.mediaStoreUri is string && data.mediaStoreUri.size() >= 1 && data.mediaStoreUri.size() <= 500 &&
+             data.verified is bool;
+    }
+
+    function isValidGenerationJob(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.projectId is string && isValidId(data.projectId) &&
+             data.projectTitle is string && data.projectTitle.size() >= 1 && data.projectTitle.size() <= 140 &&
+             isValidStyle(data.style) &&
+             isValidLanguage(data.language) &&
+             isValidDuration(data.durationMinutes) &&
+             isValidQuality(data.quality) &&
+             data.providerName is string && data.providerName.size() >= 1 && data.providerName.size() <= 100 &&
+             isValidJobStatus(data.status) &&
+             data.progressPercent is int && data.progressPercent >= 0 && data.progressPercent <= 100 &&
+             data.retryCount is int && data.retryCount >= 0 && data.retryCount <= 20 &&
+             (!('errorMessage' in data) || (data.errorMessage is string && data.errorMessage.size() <= 1000));
+    }
+
+    function isValidErrorLog(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.component is string && data.component.size() >= 1 && data.component.size() <= 100 &&
+             data.severity in ['WARN', 'ERROR', 'CRITICAL'] &&
+             data.message is string && data.message.size() >= 1 && data.message.size() <= 1000 &&
+             (!('projectId' in data) || (data.projectId is string && data.projectId.size() <= 128)) &&
+             data.resolved is bool;
+    }
+
+    function isValidAdminConfig(data) {
+      return data.activeProvider in ['FIREBASE_AI_NATIVE', 'CUSTOM_REST_BACKEND'] &&
+             data.providerLabel is string && data.providerLabel.size() >= 1 && data.providerLabel.size() <= 100 &&
+             data.remoteEndpointUrl is string && data.remoteEndpointUrl.size() <= 500 &&
+             data.timeoutSeconds is int && data.timeoutSeconds >= 10 && data.timeoutSeconds <= 600 &&
+             data.maxRetries is int && data.maxRetries >= 0 && data.maxRetries <= 10 &&
+             data.storageQuotaMb is int && data.storageQuotaMb >= 100 && data.storageQuotaMb <= 1000000 &&
+             data.adMobEnabled is bool &&
+             data.adMobBannerUnitId is string && data.adMobBannerUnitId.size() <= 200 &&
+             data.maintenanceMode is bool &&
+             data.updatedBy is string && data.updatedBy.size() >= 1 && data.updatedBy.size() <= 150;
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isValidId(userId) &&
+                       isOwner(userId) &&
+                       incoming().userId == userId &&
+                       incoming().accountStatus == 'ACTIVE' &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'preferredLanguage', 'preferredQuality', 'totalVideosCreated', 'totalDownloads', 'storageUsedBytes', 'accountStatus', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'photoUrl', 'preferredLanguage', 'preferredQuality', 'totalVideosCreated', 'totalDownloads', 'storageUsedBytes', 'accountStatus', 'createdAt', 'updatedAt']) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isValidId(userId) &&
+                       isSignedIn() &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time && (
+                         isAdmin() ||
+                         (isOwner(userId) &&
+                          incoming().accountStatus == existing().accountStatus &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoUrl', 'preferredLanguage', 'preferredQuality', 'totalVideosCreated', 'totalDownloads', 'storageUsedBytes', 'updatedAt']))
+                       );
+
+      allow delete: if isValidId(userId) && (isOwner(userId) || isAdmin());
+
+      match /projects/{projectId} {
+        allow get: if isValidId(projectId) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if isValidId(projectId) &&
+                         isOwner(userId) &&
+                         incoming().userId == userId &&
+                         incoming().keys().hasAll(['userId', 'title', 'storyPrompt', 'characterPrompt', 'characterBible', 'style', 'language', 'durationMinutes', 'quality', 'includeVoiceover', 'includeBgm', 'includeSfx', 'status', 'progressPercent', 'statusMessage', 'sceneCount', 'completedScenes', 'fileSizeBytes', 'verifiedMp4', 'retryCount', 'providerUsed', 'downloadCount', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'storyPrompt', 'characterPrompt', 'characterBible', 'style', 'language', 'durationMinutes', 'quality', 'includeVoiceover', 'includeBgm', 'includeSfx', 'status', 'progressPercent', 'statusMessage', 'sceneCount', 'completedScenes', 'localVideoPath', 'cloudVideoUrl', 'thumbnailPath', 'fileSizeBytes', 'verifiedMp4', 'retryCount', 'errorMessage', 'providerUsed', 'downloadCount', 'createdAt', 'updatedAt']) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                         isValidCartoonProject(incoming());
+
+        allow update: if isValidId(projectId) &&
+                         isSignedIn() &&
+                         isValidCartoonProject(incoming()) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().updatedAt is timestamp && incoming().updatedAt <= request.time && (
+                           isAdmin() ||
+                           (isOwner(userId) && (
+                             (existing().status != 'COMPLETED' &&
+                              incoming().diff(existing()).affectedKeys().hasOnly(['title', 'storyPrompt', 'characterPrompt', 'characterBible', 'style', 'language', 'durationMinutes', 'quality', 'includeVoiceover', 'includeBgm', 'includeSfx', 'status', 'progressPercent', 'statusMessage', 'sceneCount', 'completedScenes', 'localVideoPath', 'cloudVideoUrl', 'thumbnailPath', 'fileSizeBytes', 'verifiedMp4', 'retryCount', 'errorMessage', 'providerUsed', 'downloadCount', 'updatedAt'])) ||
+                             (existing().status == 'COMPLETED' &&
+                              incoming().status == 'COMPLETED' &&
+                              incoming().diff(existing()).affectedKeys().hasOnly(['downloadCount', 'localVideoPath', 'updatedAt']))
+                           ))
+                         );
+
+        allow delete: if isValidId(projectId) && (isOwner(userId) || isAdmin());
+
+        match /scenes/{sceneId} {
+          allow get: if isValidId(sceneId) && (isOwner(userId) || isAdmin());
+          allow list: if isOwner(userId) || isAdmin();
+
+          allow create: if isValidId(sceneId) &&
+                           isOwner(userId) &&
+                           incoming().userId == userId &&
+                           incoming().projectId == projectId &&
+                           exists(/databases/$(database)/documents/users/$(userId)/projects/$(projectId)) &&
+                           incoming().keys().hasAll(['userId', 'projectId', 'sceneIndex', 'title', 'visualPrompt', 'narrationText', 'sfxCue', 'cameraMotion', 'durationSeconds', 'status', 'createdAt', 'updatedAt']) &&
+                           incoming().keys().hasOnly(['userId', 'projectId', 'sceneIndex', 'title', 'visualPrompt', 'narrationText', 'sfxCue', 'cameraMotion', 'durationSeconds', 'artFilePath', 'audioFilePath', 'status', 'createdAt', 'updatedAt']) &&
+                           incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                           incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                           isValidCartoonScene(incoming());
+
+          allow update: if isValidId(sceneId) &&
+                           isOwner(userId) &&
+                           isValidCartoonScene(incoming()) &&
+                           incoming().userId == existing().userId &&
+                           incoming().projectId == existing().projectId &&
+                           incoming().createdAt == existing().createdAt &&
+                           incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['title', 'visualPrompt', 'narrationText', 'sfxCue', 'cameraMotion', 'durationSeconds', 'artFilePath', 'audioFilePath', 'status', 'updatedAt']);
+
+          allow delete: if isValidId(sceneId) && (isOwner(userId) || isAdmin());
+        }
+      }
+
+      match /downloads/{downloadId} {
+        allow get: if isValidId(downloadId) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+
+        allow create: if isValidId(downloadId) &&
+                         isOwner(userId) &&
+                         incoming().userId == userId &&
+                         incoming().keys().hasAll(['userId', 'projectId', 'projectTitle', 'quality', 'fileSizeBytes', 'mediaStoreUri', 'verified', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'projectId', 'projectTitle', 'quality', 'fileSizeBytes', 'mediaStoreUri', 'verified', 'createdAt']) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         isValidDownloadRecord(incoming());
+
+        allow update: if false;
+        allow delete: if isValidId(downloadId) && (isOwner(userId) || isAdmin());
+      }
+    }
+
+    match /generationJobs/{jobId} {
+      allow get: if isValidId(jobId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+
+      allow create: if isValidId(jobId) &&
+                       isSignedIn() &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'projectId', 'projectTitle', 'style', 'language', 'durationMinutes', 'quality', 'providerName', 'status', 'progressPercent', 'retryCount', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'projectId', 'projectTitle', 'style', 'language', 'durationMinutes', 'quality', 'providerName', 'status', 'progressPercent', 'retryCount', 'errorMessage', 'createdAt', 'updatedAt']) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       isValidGenerationJob(incoming());
+
+      allow update: if isValidId(jobId) &&
+                       isSignedIn() &&
+                       isValidGenerationJob(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().projectId == existing().projectId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time && (
+                         isAdmin() ||
+                         (existing().userId == request.auth.uid &&
+                          existing().status != 'COMPLETED' &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['projectTitle', 'providerName', 'status', 'progressPercent', 'retryCount', 'errorMessage', 'updatedAt']))
+                       );
+
+      allow delete: if isValidId(jobId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    match /errorLogs/{logId} {
+      allow get: if isValidId(logId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+
+      allow create: if isValidId(logId) &&
+                       isSignedIn() &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().resolved == false &&
+                       incoming().keys().hasAll(['userId', 'component', 'severity', 'message', 'resolved', 'createdAt']) &&
+                       incoming().keys().hasOnly(['userId', 'component', 'severity', 'message', 'projectId', 'resolved', 'createdAt']) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       isValidErrorLog(incoming());
+
+      allow update: if isValidId(logId) &&
+                       isAdmin() &&
+                       isValidErrorLog(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['resolved']);
+
+      allow delete: if isValidId(logId) && isAdmin();
+    }
+
+    match /adminConfig/{docId} {
+      allow get, list: if isValidId(docId) && isSignedIn();
+      allow create, update: if isValidId(docId) &&
+                               isAdmin() &&
+                               incoming().keys().hasAll(['activeProvider', 'providerLabel', 'remoteEndpointUrl', 'timeoutSeconds', 'maxRetries', 'storageQuotaMb', 'adMobEnabled', 'adMobBannerUnitId', 'maintenanceMode', 'updatedBy', 'updatedAt']) &&
+                               incoming().keys().hasOnly(['activeProvider', 'providerLabel', 'remoteEndpointUrl', 'timeoutSeconds', 'maxRetries', 'storageQuotaMb', 'adMobEnabled', 'adMobBannerUnitId', 'maintenanceMode', 'updatedBy', 'updatedAt']) &&
+                               incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                               isValidAdminConfig(incoming());
+      allow delete: if isValidId(docId) && isAdmin();
+    }
+
+    match /admins/{uid} {
+      allow get: if isValidId(uid) && (isOwner(uid) || isAdmin());
+      allow list: if isAdmin();
+      allow create, update, delete: if isValidId(uid) && isAdmin();
+    }
+  }
+}

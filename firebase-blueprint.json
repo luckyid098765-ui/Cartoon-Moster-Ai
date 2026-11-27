@@ -1,0 +1,199 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile, preferences, and usage metrics for Cartoon Master AI",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string", "description": "User display name" },
+        "email": { "type": "string", "description": "User email address" },
+        "photoUrl": { "type": "string", "description": "Optional profile avatar URL" },
+        "preferredLanguage": { "type": "string", "enum": ["ENGLISH", "HINDI", "BENGALI"] },
+        "preferredQuality": { "type": "string", "enum": ["HD_720P", "FHD_1080P"] },
+        "totalVideosCreated": { "type": "integer" },
+        "totalDownloads": { "type": "integer" },
+        "storageUsedBytes": { "type": "integer" },
+        "accountStatus": { "type": "string", "enum": ["ACTIVE", "SUSPENDED"] },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp" }
+      },
+      "required": ["userId", "displayName", "preferredLanguage", "preferredQuality", "totalVideosCreated", "totalDownloads", "storageUsedBytes", "accountStatus", "createdAt", "updatedAt"]
+    },
+    "CartoonProject": {
+      "title": "CartoonProject",
+      "description": "Cartoon video generation project with character bible, pipeline progress, and MP4 output metadata",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "storyPrompt": { "type": "string" },
+        "characterPrompt": { "type": "string" },
+        "characterBible": { "type": "string" },
+        "style": { "type": "string", "enum": ["TWO_D", "THREE_D", "FUNNY", "HORROR", "ADVENTURE", "FANTASY", "EDUCATIONAL", "KIDS_FRIENDLY"] },
+        "language": { "type": "string", "enum": ["ENGLISH", "HINDI", "BENGALI"] },
+        "durationMinutes": { "type": "integer" },
+        "quality": { "type": "string", "enum": ["HD_720P", "FHD_1080P"] },
+        "includeVoiceover": { "type": "boolean" },
+        "includeBgm": { "type": "boolean" },
+        "includeSfx": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["DRAFT", "GENERATING_STORY", "GENERATING_ART", "SYNTHESIZING_AUDIO", "RENDERING_VIDEO", "VERIFYING", "COMPLETED", "FAILED"] },
+        "progressPercent": { "type": "integer" },
+        "statusMessage": { "type": "string" },
+        "sceneCount": { "type": "integer" },
+        "completedScenes": { "type": "integer" },
+        "localVideoPath": { "type": "string" },
+        "cloudVideoUrl": { "type": "string" },
+        "thumbnailPath": { "type": "string" },
+        "fileSizeBytes": { "type": "integer" },
+        "verifiedMp4": { "type": "boolean" },
+        "retryCount": { "type": "integer" },
+        "errorMessage": { "type": "string" },
+        "providerUsed": { "type": "string" },
+        "downloadCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "storyPrompt", "characterPrompt", "characterBible", "style", "language", "durationMinutes", "quality", "includeVoiceover", "includeBgm", "includeSfx", "status", "progressPercent", "statusMessage", "sceneCount", "completedScenes", "fileSizeBytes", "verifiedMp4", "retryCount", "providerUsed", "downloadCount", "createdAt", "updatedAt"]
+    },
+    "CartoonScene": {
+      "title": "CartoonScene",
+      "description": "Individual scene checkpoint for a cartoon project",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "sceneIndex": { "type": "integer" },
+        "title": { "type": "string" },
+        "visualPrompt": { "type": "string" },
+        "narrationText": { "type": "string" },
+        "sfxCue": { "type": "string" },
+        "cameraMotion": { "type": "string" },
+        "durationSeconds": { "type": "integer" },
+        "artFilePath": { "type": "string" },
+        "audioFilePath": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "ART_READY", "AUDIO_READY", "READY", "FAILED"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "projectId", "sceneIndex", "title", "visualPrompt", "narrationText", "sfxCue", "cameraMotion", "durationSeconds", "status", "createdAt", "updatedAt"]
+    },
+    "DownloadRecord": {
+      "title": "DownloadRecord",
+      "description": "Verified MP4 export and download history record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectTitle": { "type": "string" },
+        "quality": { "type": "string", "enum": ["HD_720P", "FHD_1080P"] },
+        "fileSizeBytes": { "type": "integer" },
+        "mediaStoreUri": { "type": "string" },
+        "verified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "projectId", "projectTitle", "quality", "fileSizeBytes", "mediaStoreUri", "verified", "createdAt"]
+    },
+    "GenerationJob": {
+      "title": "GenerationJob",
+      "description": "Trackable video generation job for live monitoring and admin dashboard",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectTitle": { "type": "string" },
+        "style": { "type": "string" },
+        "language": { "type": "string" },
+        "durationMinutes": { "type": "integer" },
+        "quality": { "type": "string" },
+        "providerName": { "type": "string" },
+        "status": { "type": "string", "enum": ["QUEUED", "RUNNING", "RETRYING", "COMPLETED", "FAILED"] },
+        "progressPercent": { "type": "integer" },
+        "retryCount": { "type": "integer" },
+        "errorMessage": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "projectId", "projectTitle", "style", "language", "durationMinutes", "quality", "providerName", "status", "progressPercent", "retryCount", "createdAt", "updatedAt"]
+    },
+    "ErrorLogEntry": {
+      "title": "ErrorLogEntry",
+      "description": "Application and pipeline diagnostic error log",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "component": { "type": "string" },
+        "severity": { "type": "string", "enum": ["WARN", "ERROR", "CRITICAL"] },
+        "message": { "type": "string" },
+        "projectId": { "type": "string" },
+        "resolved": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "component", "severity", "message", "resolved", "createdAt"]
+    },
+    "AdminProviderConfig": {
+      "title": "AdminProviderConfig",
+      "description": "Publicly readable non-secret provider, quota, and monetization configuration",
+      "type": "object",
+      "properties": {
+        "activeProvider": { "type": "string", "enum": ["FIREBASE_AI_NATIVE", "CUSTOM_REST_BACKEND"] },
+        "providerLabel": { "type": "string" },
+        "remoteEndpointUrl": { "type": "string" },
+        "timeoutSeconds": { "type": "integer" },
+        "maxRetries": { "type": "integer" },
+        "storageQuotaMb": { "type": "integer" },
+        "adMobEnabled": { "type": "boolean" },
+        "adMobBannerUnitId": { "type": "string" },
+        "maintenanceMode": { "type": "boolean" },
+        "updatedBy": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["activeProvider", "providerLabel", "remoteEndpointUrl", "timeoutSeconds", "maxRetries", "storageQuotaMb", "adMobEnabled", "adMobBannerUnitId", "maintenanceMode", "updatedBy", "updatedAt"]
+    },
+    "AdminRole": {
+      "title": "AdminRole",
+      "description": "Admin role assignment document",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "grantedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email", "grantedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User account profiles and usage statistics"
+    },
+    "/users/{userId}/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/CartoonProject" },
+      "description": "User-owned cartoon projects and generated MP4 library items"
+    },
+    "/users/{userId}/projects/{projectId}/scenes/{sceneId}": {
+      "schema": { "$ref": "#/entities/CartoonScene" },
+      "description": "Scene-level storyboard, audio, and art checkpoints for a cartoon project"
+    },
+    "/users/{userId}/downloads/{downloadId}": {
+      "schema": { "$ref": "#/entities/DownloadRecord" },
+      "description": "User MP4 download history and verification records"
+    },
+    "/generationJobs/{jobId}": {
+      "schema": { "$ref": "#/entities/GenerationJob" },
+      "description": "Cross-user generation job queue and monitoring log"
+    },
+    "/errorLogs/{logId}": {
+      "schema": { "$ref": "#/entities/ErrorLogEntry" },
+      "description": "Pipeline and API error logs for admin monitoring"
+    },
+    "/adminConfig/{docId}": {
+      "schema": { "$ref": "#/entities/AdminProviderConfig" },
+      "description": "System provider and feature configuration"
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminRole" },
+      "description": "Trusted administrator role registry"
+    }
+  }
+}
