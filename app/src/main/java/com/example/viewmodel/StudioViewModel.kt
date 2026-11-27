@@ -215,8 +215,13 @@ class StudioViewModel(
 
     fun generateCartoonVideo(onProjectStarted: (String) -> Unit = {}) {
         val s = _formState.value
-        if (s.storyPrompt.isBlank()) {
+        val trimmedStory = s.storyPrompt.trim()
+        if (trimmedStory.isBlank()) {
             _formState.value = s.copy(feedbackError = "Please enter your cartoon story before generating.")
+            return
+        }
+        if (trimmedStory.length < 10) {
+            _formState.value = s.copy(feedbackError = "Please enter at least 10 characters describing your story for reliable generation.")
             return
         }
         if (s.isSubmitting) return
@@ -228,9 +233,9 @@ class StudioViewModel(
                 feedbackSuccess = null
             )
             val request = CartoonDraftRequest(
-                title = s.title.trim().ifBlank { s.storyPrompt.trim().take(36) },
-                storyPrompt = s.storyPrompt,
-                characterPrompt = s.characterPrompt,
+                title = s.title.trim().ifBlank { trimmedStory.take(36) },
+                storyPrompt = trimmedStory,
+                characterPrompt = s.characterPrompt.trim(),
                 style = s.selectedStyle,
                 language = s.selectedLanguage,
                 durationOption = s.selectedDuration,
@@ -256,6 +261,10 @@ class StudioViewModel(
     }
 
     fun retryProject(project: CartoonProject) {
+        resumeProject(project)
+    }
+
+    fun resumeProject(project: CartoonProject) {
         viewModelScope.launch {
             val request = CartoonDraftRequest(
                 existingProjectId = project.id,
@@ -273,10 +282,14 @@ class StudioViewModel(
             val res = coordinator.startOrResumeGeneration(request)
             res.onFailure { err ->
                 _formState.value = _formState.value.copy(
-                    feedbackError = err.localizedMessage ?: "Could not retry project."
+                    feedbackError = err.localizedMessage ?: "Could not resume project."
                 )
             }
         }
+    }
+
+    fun pauseGeneration(projectId: String) {
+        coordinator.pauseGeneration(projectId)
     }
 
     fun cancelGeneration(projectId: String) {
@@ -285,7 +298,10 @@ class StudioViewModel(
 
     fun downloadProjectMp4(project: CartoonProject) {
         val localPath = project.localVideoPath
-        if (!project.verifiedMp4 || localPath.isNullOrBlank()) {
+        if (project.statusEnum() != com.example.model.ProjectStatus.COMPLETED ||
+            !project.verifiedMp4 ||
+            localPath.isNullOrBlank()
+        ) {
             _exportState.value = ExportUiState.Failed(
                 project.id,
                 "MP4 file is not verified yet. Please wait for generation to complete."
@@ -293,6 +309,13 @@ class StudioViewModel(
             return
         }
         val sourceFile = File(localPath)
+        if (!sourceFile.exists() || !com.example.media.Mp4CartoonRenderer().verifyMp4File(sourceFile)) {
+            _exportState.value = ExportUiState.Failed(
+                project.id,
+                "MP4 file verification failed or file missing. Tap Retry Generation."
+            )
+            return
+        }
         viewModelScope.launch {
             downloader.exportMp4ToMovies(
                 sourceMp4 = sourceFile,

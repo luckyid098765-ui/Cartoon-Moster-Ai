@@ -23,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Button
@@ -34,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -89,9 +92,10 @@ fun VideoPlayerScreen(
 
     val playableUri: Uri? = remember(project?.localVideoPath, project?.cloudVideoUrl) {
         val localFile = project?.localVideoPath?.let { File(it) }
+        val remoteUrl = project?.cloudVideoUrl
         when {
             localFile != null && localFile.exists() -> Uri.fromFile(localFile)
-            !project?.cloudVideoUrl.isNullOrBlank() -> Uri.parse(project!!.cloudVideoUrl)
+            !remoteUrl.isNullOrBlank() -> Uri.parse(remoteUrl)
             else -> null
         }
     }
@@ -198,44 +202,77 @@ fun VideoPlayerScreen(
                             project.verifiedMp4 &&
                             !project.localVideoPath.isNullOrBlank() &&
                             File(project.localVideoPath).exists()
-                        val isExporting = exportState is ExportUiState.Exporting &&
-                            (exportState as ExportUiState.Exporting).projectId == project.id
+                        val exportingThis = (exportState as? ExportUiState.Exporting)
+                            ?.takeIf { it.projectId == project.id }
+                        val isExporting = exportingThis != null
+                        val status = project.statusEnum()
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (isVerifiedReady) {
-                                Button(
-                                    onClick = { viewModel.downloadProjectMp4(project) },
-                                    enabled = !isExporting,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(52.dp)
-                                        .testTag("player_download_button"),
-                                    colors = ButtonDefaults.buttonColors(containerColor = CoralPrimary)
-                                ) {
-                                    Icon(Icons.Filled.Download, contentDescription = null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        if (isExporting) {
-                                            "Downloading ${(exportState as ExportUiState.Exporting).percent}%..."
-                                        } else {
-                                            "${stringResource(R.string.download_video_cta)} (${project.qualityEnum().label})"
-                                        }
-                                    )
+                            when {
+                                isVerifiedReady -> {
+                                    Button(
+                                        onClick = { viewModel.downloadProjectMp4(project) },
+                                        enabled = !isExporting,
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(54.dp)
+                                            .testTag("player_download_button"),
+                                        colors = ButtonDefaults.buttonColors(containerColor = CoralPrimary)
+                                    ) {
+                                        Icon(Icons.Filled.Download, contentDescription = null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            if (exportingThis != null) {
+                                                "Downloading ${exportingThis.percent}%..."
+                                            } else {
+                                                "${stringResource(R.string.download_video_cta)} (${project.qualityEnum().label})"
+                                            }
+                                        )
+                                    }
                                 }
-                            } else if (project.statusEnum() == ProjectStatus.FAILED) {
-                                Button(
-                                    onClick = { viewModel.retryProject(project) },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(52.dp)
-                                ) {
-                                    Icon(Icons.Filled.Refresh, contentDescription = null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(stringResource(R.string.retry_generation_cta))
+                                status.isRunning -> {
+                                    OutlinedButton(
+                                        onClick = { viewModel.pauseGeneration(project.id) },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(52.dp)
+                                            .testTag("player_pause_button")
+                                    ) {
+                                        Icon(Icons.Filled.Pause, contentDescription = null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(stringResource(R.string.pause_generation_cta))
+                                    }
+                                }
+                                status == ProjectStatus.PAUSED -> {
+                                    Button(
+                                        onClick = { viewModel.resumeProject(project) },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(52.dp)
+                                            .testTag("player_resume_button"),
+                                        colors = ButtonDefaults.buttonColors(containerColor = CoralPrimary)
+                                    ) {
+                                        Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(stringResource(R.string.resume_generation_cta))
+                                    }
+                                }
+                                status == ProjectStatus.FAILED -> {
+                                    Button(
+                                        onClick = { viewModel.resumeProject(project) },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(52.dp)
+                                            .testTag("player_retry_button")
+                                    ) {
+                                        Icon(Icons.Filled.Refresh, contentDescription = null)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(stringResource(R.string.retry_generation_cta))
+                                    }
                                 }
                             }
                         }
@@ -248,21 +285,42 @@ fun VideoPlayerScreen(
                             ) {
                                 Icon(Icons.Filled.Verified, contentDescription = null, tint = EmeraldSuccess, modifier = Modifier.size(18.dp))
                                 Text(
-                                    text = "Verified MP4 • ${project.durationMinutes} min • ${project.qualityEnum().label} • ${project.languageEnum().label}",
+                                    text = "${stringResource(R.string.successfully_completed_badge)} • ${project.durationMinutes} min • ${project.qualityEnum().label} • ${project.languageEnum().label}",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = EmeraldSuccess
                                 )
                             }
                         }
 
-                        if (exportState is ExportUiState.Done && (exportState as ExportUiState.Done).projectId == project.id) {
+                        val expDone = (exportState as? ExportUiState.Done)?.takeIf { it.projectId == project.id }
+                        if (expDone != null) {
                             Spacer(Modifier.height(8.dp))
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = EmeraldSuccess, modifier = Modifier.size(18.dp))
-                                Text((exportState as ExportUiState.Done).message, color = EmeraldSuccess)
+                                Text(expDone.message, color = EmeraldSuccess)
+                            }
+                        }
+
+                        val expFail = (exportState as? ExportUiState.Failed)?.takeIf { it.projectId == project.id }
+                        if (expFail != null) {
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = expFail.message,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedButton(onClick = { viewModel.downloadProjectMp4(project) }) {
+                                    Text(stringResource(R.string.retry_download_cta))
+                                }
                             }
                         }
                     }

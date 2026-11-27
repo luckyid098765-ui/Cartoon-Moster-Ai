@@ -159,6 +159,18 @@ test("Cartoon project & scene lifecycle, terminal locking, and cross-user denial
     })
   );
 
+  // Pause & resume transition allowed while not COMPLETED
+  await assertSucceeds(
+    projectRef.update({
+      status: "PAUSED",
+      progressPercent: 45,
+      statusMessage: "Paused at checkpoint",
+      quality: "SD_480P",
+      style: "CINEMATIC",
+      updatedAt: new Date(Date.now() - 800),
+    })
+  );
+
   // Complete project
   await assertSucceeds(
     projectRef.update({

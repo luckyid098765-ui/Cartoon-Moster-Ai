@@ -507,6 +507,33 @@ class CartoonRepository(
         }
     }
 
+    suspend fun markProjectPaused(
+        projectId: String,
+        progressPercent: Int,
+        statusMessage: String
+    ): Result<Unit> {
+        var path = "users/${auth.currentUser?.uid ?: "unauth"}/projects/$projectId"
+        return try {
+            val uid = requireUserId()
+            val ref = db.collection("users").document(uid).collection("projects").document(projectId)
+            path = ref.path
+            ref.update(
+                mapOf(
+                    "status" to ProjectStatus.PAUSED.name,
+                    "progressPercent" to progressPercent.coerceIn(0, 99).toLong(),
+                    "statusMessage" to statusMessage.take(300),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, path)
+            Result.failure(e)
+        }
+    }
+
     suspend fun recordDownload(
         project: CartoonProject,
         mediaStoreUri: String,

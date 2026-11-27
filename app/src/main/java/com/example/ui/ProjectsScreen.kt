@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Verified
@@ -229,6 +230,7 @@ fun ProjectsScreen(
                             }
                             is ExportUiState.Failed -> {
                                 item {
+                                    val failedProject = state.projects.firstOrNull { it.id == exp.projectId }
                                     Card(
                                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                                         shape = RoundedCornerShape(14.dp)
@@ -238,13 +240,21 @@ fun ProjectsScreen(
                                                 .fillMaxWidth()
                                                 .padding(12.dp),
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
                                             Text(
                                                 exp.message,
                                                 style = MaterialTheme.typography.bodySmall,
                                                 modifier = Modifier.weight(1f)
                                             )
+                                            if (failedProject != null) {
+                                                OutlinedButton(
+                                                    onClick = { viewModel.downloadProjectMp4(failedProject) },
+                                                    modifier = Modifier.testTag("retry_download_${failedProject.id}")
+                                                ) {
+                                                    Text(stringResource(R.string.retry_download_cta))
+                                                }
+                                            }
                                             TextButton(onClick = viewModel::resetExportState) {
                                                 Text("Dismiss")
                                             }
@@ -261,7 +271,8 @@ fun ProjectsScreen(
                                 exportState = exportState,
                                 onPlay = { onOpenPlayer(project.id) },
                                 onDownload = { viewModel.downloadProjectMp4(project) },
-                                onRetry = { viewModel.retryProject(project) },
+                                onPause = { viewModel.pauseGeneration(project.id) },
+                                onResume = { viewModel.resumeProject(project) },
                                 onDelete = { pendingDelete = project }
                             )
                         }
@@ -278,11 +289,15 @@ private fun ProjectCard(
     exportState: ExportUiState,
     onPlay: () -> Unit,
     onDownload: () -> Unit,
-    onRetry: () -> Unit,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
     onDelete: () -> Unit
 ) {
     val status = project.statusEnum()
-    val isExportingThis = exportState is ExportUiState.Exporting && exportState.projectId == project.id
+    val exportingPercent = (exportState as? ExportUiState.Exporting)
+        ?.takeIf { it.projectId == project.id }
+        ?.percent
+    val isExportingThis = exportingPercent != null
     val hasLocalMp4 = project.verifiedMp4 && !project.localVideoPath.isNullOrBlank() && File(project.localVideoPath).exists()
 
     Card(
@@ -352,14 +367,14 @@ private fun ProjectCard(
                 }
             }
 
-            if (status.isRunning) {
+            if (status.isRunning || status == ProjectStatus.PAUSED) {
                 LinearProgressIndicator(
                     progress = { project.progressPercent / 100f },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(7.dp)
                         .clip(RoundedCornerShape(4.dp)),
-                    color = CoralPrimary
+                    color = if (status == ProjectStatus.PAUSED) GoldenAmber else CoralPrimary
                 )
                 Text(
                     text = "${project.progressPercent}% — ${project.statusMessage}",
@@ -376,13 +391,12 @@ private fun ProjectCard(
                 )
             }
 
-            if (isExportingThis) {
-                val pct = (exportState as ExportUiState.Exporting).percent
+            if (exportingPercent != null) {
                 LinearProgressIndicator(
-                    progress = { pct / 100f },
+                    progress = { exportingPercent / 100f },
                     modifier = Modifier.fillMaxWidth()
                 )
-                Text("Exporting verified MP4 to Movies ($pct%)...", style = MaterialTheme.typography.labelSmall)
+                Text("Exporting verified MP4 to Movies ($exportingPercent%)...", style = MaterialTheme.typography.labelSmall)
             }
 
             Row(
@@ -414,9 +428,28 @@ private fun ProjectCard(
                         Spacer(Modifier.width(4.dp))
                         Text(stringResource(R.string.download_video_cta))
                     }
+                } else if (status == ProjectStatus.PAUSED) {
+                    Button(
+                        onClick = onResume,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("resume_project_${project.id}"),
+                        colors = ButtonDefaults.buttonColors(containerColor = CoralPrimary)
+                    ) {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.resume_generation_cta))
+                    }
+                    OutlinedButton(
+                        onClick = onPlay,
+                        modifier = Modifier.height(48.dp)
+                    ) {
+                        Text("Storyboard")
+                    }
                 } else if (status == ProjectStatus.FAILED) {
                     Button(
-                        onClick = onRetry,
+                        onClick = onResume,
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp)
@@ -432,6 +465,26 @@ private fun ProjectCard(
                     ) {
                         Text("Details")
                     }
+                } else if (status.isRunning) {
+                    OutlinedButton(
+                        onClick = onPause,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .testTag("pause_project_${project.id}")
+                    ) {
+                        Icon(Icons.Filled.Pause, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.pause_generation_cta))
+                    }
+                    OutlinedButton(
+                        onClick = onPlay,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                    ) {
+                        Text("Live Progress")
+                    }
                 } else {
                     OutlinedButton(
                         onClick = onPlay,
@@ -439,7 +492,7 @@ private fun ProjectCard(
                             .fillMaxWidth()
                             .height(48.dp)
                     ) {
-                        Text("View Live Storyboard & Progress")
+                        Text("View Storyboard")
                     }
                 }
             }
@@ -470,7 +523,7 @@ private fun StatusPill(status: ProjectStatus, verified: Boolean, sizeBytes: Long
                 Icon(Icons.Filled.Verified, contentDescription = null, tint = fg, modifier = Modifier.size(13.dp))
             }
             Text(
-                text = if (status == ProjectStatus.COMPLETED && verified) "Verified MP4 $sizeMb" else status.label,
+                text = if (status == ProjectStatus.COMPLETED && verified) "SUCCESSFULLY COMPLETED $sizeMb" else status.label,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = fg

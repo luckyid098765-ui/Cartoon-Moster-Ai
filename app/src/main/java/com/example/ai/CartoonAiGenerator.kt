@@ -102,6 +102,10 @@ class CartoonAiGenerator {
         timeoutMs: Long,
         onRetry: suspend (attempt: Int, reason: String) -> Unit
     ): GeneratedStoryPlan {
+        val cleanStory = storyPrompt.trim()
+        require(cleanStory.length >= 10) {
+            "Story prompt is too short. Please enter at least 10 characters describing your cartoon."
+        }
         val targetScenes = targetSceneCountFor(duration)
         val totalSeconds = duration.minutes * 60
         val secondsPerScene = (totalSeconds / targetScenes).coerceAtLeast(10)
@@ -116,15 +120,15 @@ class CartoonAiGenerator {
             appendLine("You are an award-winning cartoon director and screenplay writer.")
             appendLine("Create a complete, original animated cartoon episode plan.")
             appendLine("Title hint: ${titleHint.ifBlank { "Auto-generate an exciting title" }}")
-            appendLine("Story premise: $storyPrompt")
+            appendLine("Story premise: $cleanStory")
             if (characterPrompt.isNotBlank()) {
                 appendLine("User-defined characters (MUST preserve faithfully): $characterPrompt")
             }
             appendLine("Cartoon style: ${style.label} (${style.visualDirective})")
             appendLine("Target duration: ${duration.minutes} minutes ($totalSeconds seconds total).")
             appendLine("Generate EXACTLY $targetScenes distinct sequential scenes.")
-            appendLine("LANGUAGE RULE: $languageInstruction")
-            appendLine("CONSISTENCY RULE: In characterBible, lock exact colors, outfits, accessories, and facial traits for every main character. Keep visualPrompt in English for the image generator, explicitly repeating each character's visual traits.")
+            appendLine("LANGUAGE & VOICE RULE: $languageInstruction Maintain a single consistent narrator voice tone across every scene.")
+            appendLine("VISUAL & BACKGROUND CONSISTENCY RULE: In characterBible, lock exact character colors, outfits, accessories, facial traits, AND recurring world palette/lighting/background architecture. Keep visualPrompt in English for the image generator, explicitly repeating each character's visual traits and background continuity.")
             appendLine("Ensure narrationText per scene takes roughly $secondsPerScene seconds to speak clearly and tells a cohesive story with beginning, rising action, climax, and resolution.")
         }
 
@@ -284,7 +288,7 @@ class CartoonAiGenerator {
             if (attempt >= maxRetries) break
             attempt++
             val backoffMs = (1500L * attempt).coerceAtMost(8000L)
-            onRetry(attempt, lastError?.localizedMessage ?: "Temporary AI service error")
+            onRetry(attempt, lastError.localizedMessage ?: "Temporary AI service error")
             delay(backoffMs)
         }
         throw lastError ?: IllegalStateException("AI generation failed after retries.")

@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -46,6 +48,7 @@ import com.example.R
 import com.example.auth.authStateFlow
 import com.example.auth.signOut
 import com.example.viewmodel.AdminViewModel
+import com.example.viewmodel.ChatViewModel
 import com.example.viewmodel.StudioViewModel
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
@@ -53,6 +56,7 @@ import com.google.firebase.auth.auth
 
 object Routes {
     const val STUDIO = "studio"
+    const val CHAT = "chat"
     const val PROJECTS = "projects"
     const val ADMIN = "admin"
     const val PLAYER = "player/{projectId}"
@@ -107,6 +111,15 @@ private fun AuthenticatedShell(currentUserId: String) {
                     selectedIcon = Icons.Filled.AutoAwesome,
                     unselectedIcon = Icons.Outlined.AutoAwesome,
                     testTag = "nav_studio"
+                )
+            )
+            add(
+                TopDestination(
+                    route = Routes.CHAT,
+                    labelRes = R.string.nav_chat,
+                    selectedIcon = Icons.Filled.Forum,
+                    unselectedIcon = Icons.Outlined.Forum,
+                    testTag = "nav_chat"
                 )
             )
             add(
@@ -218,6 +231,24 @@ private fun AuthenticatedShell(currentUserId: String) {
                                 },
                                 onOpenPlayer = { projectId ->
                                     navController.navigate(Routes.player(projectId))
+                                }
+                            )
+                        }
+                        composable(Routes.CHAT) {
+                            val chatVm: ChatViewModel = viewModel(
+                                key = "chat_$currentUserId",
+                                factory = ChatViewModel.provideFactory()
+                            )
+                            ChatScreen(
+                                viewModel = chatVm,
+                                onApplyStoryToStudio = { storyText, lang ->
+                                    studioViewModel.updateStoryPrompt(storyText.take(2500))
+                                    studioViewModel.selectLanguage(lang)
+                                    navController.navigate(Routes.STUDIO) {
+                                        popUpTo(Routes.STUDIO) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 }
                             )
                         }

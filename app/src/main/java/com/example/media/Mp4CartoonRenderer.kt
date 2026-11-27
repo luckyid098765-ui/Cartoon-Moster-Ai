@@ -69,6 +69,8 @@ class Mp4CartoonRenderer {
     ): RenderedMp4Result = withContext(Dispatchers.Default) {
         require(scenes.isNotEmpty()) { "No scenes available to render." }
         outputMp4File.parentFile?.mkdirs()
+        val tempMp4File = File(outputMp4File.parentFile, "${outputMp4File.nameWithoutExtension}.tmp.mp4")
+        if (tempMp4File.exists()) tempMp4File.delete()
         if (outputMp4File.exists()) outputMp4File.delete()
 
         val width = quality.width
@@ -112,7 +114,7 @@ class Mp4CartoonRenderer {
             audioEncoder.configure(audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             audioEncoder.start()
 
-            muxer = MediaMuxer(outputMp4File.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            muxer = MediaMuxer(tempMp4File.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
 
             val videoBufferInfo = MediaCodec.BufferInfo()
             val audioBufferInfo = MediaCodec.BufferInfo()
@@ -346,9 +348,14 @@ class Mp4CartoonRenderer {
             }
 
             onProgress(96, "Verifying MP4 integrity & extracting thumbnail...")
-            val verified = verifyMp4File(outputMp4File)
+            val verified = verifyMp4File(tempMp4File)
             if (!verified) {
                 throw IllegalStateException("MP4 verification failed: generated output file is corrupted or incomplete.")
+            }
+
+            if (!tempMp4File.renameTo(outputMp4File)) {
+                tempMp4File.copyTo(outputMp4File, overwrite = true)
+                tempMp4File.delete()
             }
 
             val durationMs = extractThumbnailAndDuration(outputMp4File, thumbnailFile, scenes.firstOrNull()?.artFilePath)
@@ -359,6 +366,10 @@ class Mp4CartoonRenderer {
                 durationMs = durationMs,
                 verified = true
             )
+        } catch (e: Exception) {
+            runCatching { tempMp4File.delete() }
+            runCatching { outputMp4File.delete() }
+            throw e
         } finally {
             frameBitmap.recycle()
             runCatching { eglHelper?.release() }
@@ -509,8 +520,9 @@ class Mp4CartoonRenderer {
         return try {
             retriever.setDataSource(file.absolutePath)
             val hasVideo = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO)
+            val hasAudio = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO)
             val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-            hasVideo == "yes" && durationMs > 0L
+            hasVideo == "yes" && hasAudio == "yes" && durationMs > 0L
         } catch (e: Exception) {
             Log.e(TAG, "MediaMetadataRetriever verification failed", e)
             false

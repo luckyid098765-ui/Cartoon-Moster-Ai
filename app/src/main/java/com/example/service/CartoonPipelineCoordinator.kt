@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
+import android.os.StatFs
 import android.util.Log
 import com.example.R
 import com.example.ai.CartoonAiGenerator
@@ -51,6 +52,8 @@ class CartoonPipelineCoordinator private constructor(private val appContext: Con
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutex = Mutex()
     private val activeJobs = mutableMapOf<String, Job>()
+    private val pausedProjectIds = mutableSetOf<String>()
+    private val lastProgressByProject = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
     private val db: FirebaseFirestore by lazy {
         FirebaseFirestore.getInstance(appContext.getString(R.string.firestore_database_id))
@@ -86,6 +89,15 @@ class CartoonPipelineCoordinator private constructor(private val appContext: Con
             )
         }
 
+        val minRequiredBytes = (request.durationOption.minutes.toLong() * 8L + 32L) * 1024L * 1024L
+        val availableBytes = runCatching { StatFs(appContext.filesDir.absolutePath).availableBytes }.getOrDefault(Long.MAX_VALUE)
+        if (availableBytes < minRequiredBytes) {
+            val needMb = minRequiredBytes / (1024L * 1024L)
+            return Result.failure(
+                IllegalStateException("Insufficient device storage. At least ${needMb} MB free space is recommended to render safely.")
+            )
+        }
+
         val projectResult = cartoonRepo.createOrResetProject(request, providerMode)
         val project = projectResult.getOrElse { return Result.failure(it) }
 
@@ -93,6 +105,7 @@ class CartoonPipelineCoordinator private constructor(private val appContext: Con
             if (activeJobs[project.id]?.isActive == true) {
                 false
             } else {
+                pausedProjectIds.remove(project.id)
                 val job = scope.launch {
                     runPipeline(
                         uid = currentUser.uid,
@@ -119,13 +132,29 @@ class CartoonPipelineCoordinator private constructor(private val appContext: Con
         return Result.success(project)
     }
 
+    fun pauseGeneration(projectId: String) {
+        scope.launch {
+            mutex.withLock {
+                pausedProjectIds.add(projectId)
+                activeJobs.remove(projectId)?.cancel()
+                if (activeJobs.isEmpty()) {
+                    stopForegroundServiceSafe()
+                }
+            }
+            _activeBanner.value = null
+        }
+    }
+
     fun cancelGeneration(projectId: String) {
         scope.launch {
             mutex.withLock {
+                pausedProjectIds.remove(projectId)
                 activeJobs.remove(projectId)?.cancel()
+                if (activeJobs.isEmpty()) {
+                    stopForegroundServiceSafe()
+                }
             }
             _activeBanner.value = null
-            stopForegroundServiceSafe()
         }
     }
 
@@ -145,6 +174,8 @@ class CartoonPipelineCoordinator private constructor(private val appContext: Con
         val finalMp4 = File(videosDir, "${projectId}.mp4")
         val thumbFile = File(videosDir, "${projectId}_thumb.jpg")
         var retryCount = initialProject.retryCount.toInt()
+        val initialPct = initialProject.progressPercent.toInt().coerceIn(5, 99)
+        lastProgressByProject[projectId] = initialPct
 
         try {
             updateBanner(projectId, initialProject.title, ProjectStatus.GENERATING_STORY, 5, "Starting AI cartoon director...")
@@ -318,7 +349,7 @@ class CartoonPipelineCoordinator private constructor(private val appContext: Con
                 cartoonRepo.upsertScene(projectId, readyScene)
                 updatedScenes.add(readyScene)
             }
-            charSheetBitmap?.recycle()
+            charSheetBitmap.recycle()
 
             // Phase 4: Hardware-Accelerated MP4 Rendering & Verification
             updateBanner(projectId, currentTitle, ProjectStatus.RENDERING_VIDEO, 70, "Encoding ${request.quality.label} MP4...")
@@ -345,7 +376,10 @@ class CartoonPipelineCoordinator private constructor(private val appContext: Con
             // Cleanup bulky temporary WAV files safely after MP4 verification
             cleanupTemporaryAudioFiles(workDir)
 
-            // Phase 5: Mark Verified & Completed in Firestore
+            // Phase 5: Final Verification Guard before marking Verified & Completed in Firestore
+            if (!mp4Renderer.verifyMp4File(renderResult.mp4File) || renderResult.fileSizeBytes <= 0L) {
+                throw IllegalStateException("Generated MP4 failed final file integrity verification.")
+            }
             cartoonRepo.markProjectCompleted(
                 projectId = projectId,
                 localVideoPath = renderResult.mp4File.absolutePath,
@@ -357,10 +391,22 @@ class CartoonPipelineCoordinator private constructor(private val appContext: Con
             cartoonRepo.upsertJob(jobId, initialProject, JobStatus.COMPLETED, 100, retryCount, providerMode.name)
             _activeBanner.value = null
         } catch (e: CancellationException) {
-            Log.w(TAG, "Pipeline cancelled for $projectId")
-            cartoonRepo.markProjectFailed(projectId, "Generation cancelled by user. Tap Retry to resume.", retryCount)
-            cartoonRepo.upsertJob(jobId, initialProject, JobStatus.FAILED, 0, retryCount, providerMode.name, "Cancelled")
-            _activeBanner.value = null
+            val isPaused = mutex.withLock { pausedProjectIds.remove(projectId) }
+            val latestPct = lastProgressByProject[projectId] ?: initialPct
+            if (isPaused) {
+                Log.i(TAG, "Pipeline paused at $latestPct% for $projectId")
+                cartoonRepo.markProjectPaused(
+                    projectId = projectId,
+                    progressPercent = latestPct,
+                    statusMessage = "Paused at $latestPct% checkpoint. Tap Resume to continue."
+                )
+                cartoonRepo.upsertJob(jobId, initialProject, JobStatus.PAUSED, latestPct, retryCount, providerMode.name)
+            } else {
+                Log.w(TAG, "Pipeline cancelled for $projectId")
+                cartoonRepo.markProjectFailed(projectId, "Generation cancelled by user. Tap Retry to resume.", retryCount)
+                cartoonRepo.upsertJob(jobId, initialProject, JobStatus.FAILED, latestPct, retryCount, providerMode.name, "Cancelled")
+            }
+            if (_activeBanner.value?.projectId == projectId) _activeBanner.value = null
             throw e
         } catch (e: Exception) {
             val friendlyMsg = e.localizedMessage?.takeIf { it.isNotBlank() }
@@ -369,7 +415,7 @@ class CartoonPipelineCoordinator private constructor(private val appContext: Con
             cartoonRepo.markProjectFailed(projectId, friendlyMsg, retryCount)
             cartoonRepo.upsertJob(jobId, initialProject, JobStatus.FAILED, 0, retryCount, providerMode.name, friendlyMsg)
             cartoonRepo.logPipelineError("CartoonPipeline", "ERROR", friendlyMsg, projectId)
-            _activeBanner.value = null
+            if (_activeBanner.value?.projectId == projectId) _activeBanner.value = null
         } finally {
             mutex.withLock {
                 activeJobs.remove(projectId)
@@ -388,6 +434,7 @@ class CartoonPipelineCoordinator private constructor(private val appContext: Con
         message: String,
         retryAttempt: Int = 0
     ) {
+        lastProgressByProject[projectId] = progress
         _activeBanner.value = ActivePipelineBanner(
             projectId = projectId,
             title = title,

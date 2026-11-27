@@ -7,8 +7,10 @@ import com.google.firebase.firestore.IgnoreExtraProperties
 import com.google.firebase.firestore.ServerTimestamp
 
 enum class CartoonStyle(val label: String, val visualDirective: String) {
-    TWO_D("2D Classic", "vibrant 2D hand-drawn cartoon animation, clean bold ink outlines, expressive cel shading"),
-    THREE_D("3D Pixar", "high-end 3D animated film render, soft global illumination, tactile stylized characters"),
+    THREE_D("3D Animation", "high-end 3D animated film render, soft global illumination, tactile stylized characters"),
+    TWO_D("2D Animation", "vibrant 2D hand-drawn cartoon animation, clean bold ink outlines, expressive cel shading"),
+    REALISTIC_CARTOON("Realistic Cartoon", "semi-realistic stylized CGI animation with detailed fur, fabrics, skin shading, and natural lighting"),
+    CINEMATIC("Cinematic Animation", "widescreen theatrical animated film look, dramatic volumetric lighting, rich depth of field"),
     FUNNY("Comedy", "slapstick expressive cartoon style, exaggerated poses, bright saturated comedy palette"),
     HORROR("Spooky", "atmospheric eerie gothic cartoon style, dramatic moonlight shadows, glowing mist, kid-safe spooky mood"),
     ADVENTURE("Adventure", "cinematic heroic animated adventure style, sweeping vistas, dynamic lighting"),
@@ -47,8 +49,9 @@ enum class VideoDurationOption(val minutes: Int, val label: String) {
 }
 
 enum class VideoQuality(val label: String, val width: Int, val height: Int, val bitrateBps: Int) {
-    HD_720P("HD 720p", 1280, 720, 2_800_000),
-    FHD_1080P("Full HD 1080p", 1920, 1080, 5_000_000);
+    SD_480P("480p SD", 854, 480, 1_400_000),
+    HD_720P("720p HD", 1280, 720, 2_800_000),
+    FHD_1080P("1080p Full HD", 1920, 1080, 5_000_000);
 
     companion object {
         fun safeValueOf(raw: String?): VideoQuality =
@@ -63,6 +66,7 @@ enum class ProjectStatus(val label: String) {
     SYNTHESIZING_AUDIO("Creating Voiceover & Audio"),
     RENDERING_VIDEO("Rendering MP4 Video"),
     VERIFYING("Verifying MP4 Output"),
+    PAUSED("Paused"),
     COMPLETED("Ready"),
     FAILED("Failed");
 
@@ -96,6 +100,7 @@ enum class JobStatus {
     QUEUED,
     RUNNING,
     RETRYING,
+    PAUSED,
     COMPLETED,
     FAILED;
 

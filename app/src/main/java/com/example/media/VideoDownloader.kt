@@ -60,32 +60,38 @@ class VideoDownloader(private val context: Context) {
                 val uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
                     ?: throw IllegalStateException("Could not create MediaStore entry in Movies/CartoonMasterAI.")
 
-                var copied = 0L
-                val buf = ByteArray(64 * 1024)
-                resolver.openOutputStream(uri)?.use { out ->
-                    FileInputStream(sourceMp4).use { input ->
-                        while (true) {
-                            val read = input.read(buf)
-                            if (read <= 0) break
-                            out.write(buf, 0, read)
-                            copied += read
-                            val pct = ((copied.toDouble() / totalBytes.toDouble()) * 100).toInt().coerceIn(0, 99)
-                            emit(DownloadProgress.Running(pct))
+                try {
+                    var copied = 0L
+                    val buf = ByteArray(64 * 1024)
+                    resolver.openOutputStream(uri)?.use { out ->
+                        FileInputStream(sourceMp4).use { input ->
+                            while (true) {
+                                val read = input.read(buf)
+                                if (read <= 0) break
+                                out.write(buf, 0, read)
+                                copied += read
+                                val pct = ((copied.toDouble() / totalBytes.toDouble()) * 100).toInt().coerceIn(0, 99)
+                                emit(DownloadProgress.Running(pct))
+                            }
+                            out.flush()
                         }
-                        out.flush()
+                    } ?: throw IllegalStateException("Could not open MediaStore output stream.")
+
+                    values.clear()
+                    values.put(MediaStore.Video.Media.IS_PENDING, 0)
+                    resolver.update(uri, values, null, null)
+
+                    // Verify exported file size via ContentResolver
+                    val verifiedSize = resolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: copied
+                    if (verifiedSize < totalBytes) {
+                        resolver.delete(uri, null, null)
+                        throw IllegalStateException("Downloaded MP4 verification failed (size mismatch).")
                     }
-                } ?: throw IllegalStateException("Could not open MediaStore output stream.")
-
-                values.clear()
-                values.put(MediaStore.Video.Media.IS_PENDING, 0)
-                resolver.update(uri, values, null, null)
-
-                // Verify exported file size via ContentResolver
-                val verifiedSize = resolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: copied
-                if (verifiedSize < totalBytes) {
-                    throw IllegalStateException("Downloaded MP4 verification failed (size mismatch).")
+                    emit(DownloadProgress.Completed(uri.toString(), verifiedSize))
+                } catch (copyError: Exception) {
+                    runCatching { resolver.delete(uri, null, null) }
+                    throw copyError
                 }
-                emit(DownloadProgress.Completed(uri.toString(), verifiedSize))
             } else {
                 val moviesDir = File(
                     context.getExternalFilesDir(Environment.DIRECTORY_MOVIES),

@@ -42,11 +42,11 @@ service cloud.firestore {
     }
 
     function isValidQuality(q) {
-      return q in ['HD_720P', 'FHD_1080P'];
+      return q in ['SD_480P', 'HD_720P', 'FHD_1080P'];
     }
 
     function isValidStyle(s) {
-      return s in ['TWO_D', 'THREE_D', 'FUNNY', 'HORROR', 'ADVENTURE', 'FANTASY', 'EDUCATIONAL', 'KIDS_FRIENDLY'];
+      return s in ['TWO_D', 'THREE_D', 'REALISTIC_CARTOON', 'CINEMATIC', 'FUNNY', 'HORROR', 'ADVENTURE', 'FANTASY', 'EDUCATIONAL', 'KIDS_FRIENDLY'];
     }
 
     function isValidDuration(d) {
@@ -54,7 +54,7 @@ service cloud.firestore {
     }
 
     function isValidProjectStatus(st) {
-      return st in ['DRAFT', 'GENERATING_STORY', 'GENERATING_ART', 'SYNTHESIZING_AUDIO', 'RENDERING_VIDEO', 'VERIFYING', 'COMPLETED', 'FAILED'];
+      return st in ['DRAFT', 'GENERATING_STORY', 'GENERATING_ART', 'SYNTHESIZING_AUDIO', 'RENDERING_VIDEO', 'VERIFYING', 'PAUSED', 'COMPLETED', 'FAILED'];
     }
 
     function isValidSceneStatus(st) {
@@ -62,7 +62,7 @@ service cloud.firestore {
     }
 
     function isValidJobStatus(st) {
-      return st in ['QUEUED', 'RUNNING', 'RETRYING', 'COMPLETED', 'FAILED'];
+      return st in ['QUEUED', 'RUNNING', 'RETRYING', 'PAUSED', 'COMPLETED', 'FAILED'];
     }
 
     function isValidUserProfile(data) {
